@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -10,20 +11,33 @@ import (
 	"golang.org/x/mod/module"
 )
 
+var single = flag.Bool("s", false, "print logs for a single module")
+
 func main() {
-	if len(os.Args) != 4 {
+	flag.Parse()
+
+	args := flag.Args()
+
+	if len(args) != 3 {
 		fmt.Fprintf(os.Stderr, `Usage:
-   %s [module] [from-revision] [to-revision]
+   %s [-s] module from-revision to-revision
+
+	   -s - prints revision logs for a single module
 `, path.Base(os.Args[0]))
 
 		os.Exit(1)
 	}
 
-	target := os.Args[1]
-	fromVersion := os.Args[2]
-	toVersion := os.Args[3]
+	target := args[0]
+	fromVersion := args[1]
+	toVersion := args[2]
 
 	repo := NewRepo(target)
+
+	if *single {
+		log(target, fromVersion, toVersion)
+		return
+	}
 
 	from := ResolveGoModFile(repo.GoModule(fromVersion))
 	to := ResolveGoModFile(repo.GoModule(toVersion))

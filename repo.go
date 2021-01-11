@@ -8,6 +8,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/vcs"
 )
@@ -105,8 +106,30 @@ func (g *gitRepo) Log(from, to string, callback func(Commit)) {
 	end := plumbing.NewHash(to)
 	start := plumbing.NewHash(from)
 
-	iter, err := g.repo.Log(&git.LogOptions{From: end})
+	// In the case 'start' is not a ancestor commit of 'end' we'll
+	// print parent commits that are unique to 'end'
+	exclude := make(map[plumbing.Hash]struct{})
+	excludeIter, err := g.repo.Log(&git.LogOptions{From: start})
 	errcheck(err, "failed to create iterator for repo %s", g.url)
+	defer excludeIter.Close()
+
+	err = excludeIter.ForEach(func(c *object.Commit) error {
+		exclude[c.Hash] = struct{}{}
+		return nil
+	})
+
+	errcheck(err, "failed to iterate over commits")
+
+	var validFunc object.CommitFilter = func(c *object.Commit) bool {
+		_, ok := exclude[c.Hash]
+		return !ok
+	}
+
+	commit, err := g.repo.CommitObject(end)
+	errcheck(err, "failed to get commit for hash")
+
+	iter := object.NewFilterCommitIter(commit, &validFunc, nil)
+	defer iter.Close()
 
 	err = iter.ForEach(func(c *object.Commit) error {
 		if c.Hash == start {
@@ -120,4 +143,5 @@ func (g *gitRepo) Log(from, to string, callback func(Commit)) {
 
 		return nil
 	})
+	errcheck(err, "failed to iterate over commits")
 }
