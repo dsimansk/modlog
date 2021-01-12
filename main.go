@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 
 	"golang.org/x/mod/modfile"
@@ -83,7 +84,6 @@ func log(mod, from, to string) {
 	to = GoModVersionToRevision(to)
 
 	repo := NewRepo(mod)
-
 	start := repo.HashFor(from)
 	end := repo.HashFor(to)
 
@@ -95,7 +95,13 @@ func log(mod, from, to string) {
 			index = len(c.Message)
 		}
 
-		fmt.Printf("  > %s %s\n", c.Hash[:7], c.Message[:index])
+		// We don't want to link the issue #'s since that'll be noisy
+		// Github will spam repos with references based on the `#{num}`
+		// appearing in the commit message - this replace avoids that
+		// by changing it to `# {num}`
+		message := ghNum.ReplaceAllString(c.Message[:index], "# $1")
+
+		fmt.Printf("  > %s %s\n", c.Hash[:7], message)
 	})
 }
 
@@ -104,3 +110,5 @@ func errcheck(err error, format string, args ...interface{}) {
 		panic(fmt.Errorf(format+": %w", append(args, err)...))
 	}
 }
+
+var ghNum = regexp.MustCompile(`#(\d+)`)
