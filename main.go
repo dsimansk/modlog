@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
+	"golang.org/x/mod/semver"
 )
 
 var single = flag.Bool("s", false, "print logs for a single module")
@@ -57,9 +58,15 @@ func main() {
 	}
 }
 
+// From: https://github.com/golang/go/blob/069f9d96d179becc61231d566c9a75f1ec26e991/src/cmd/go/internal/modfetch/pseudo.go#L49
+var pseudoVersionRE = regexp.MustCompile(`^v[0-9]+\.(0\.0-|\d+\.\d+-([^+]*\.)?0\.)\d{14}-[A-Za-z0-9]+(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
+
 func GoModVersionToRevision(v string) string {
-	if strings.HasPrefix(v, "v0.0.0") {
-		return strings.Split(v, "-")[2]
+	isPseudo := strings.Count(v, "-") >= 2 && semver.IsValid(v) && pseudoVersionRE.MatchString(v)
+	if isPseudo {
+		v = strings.TrimSuffix(v, semver.Build(v))
+		i := strings.LastIndex(v, "-")
+		return v[i+1:]
 	}
 
 	return v
